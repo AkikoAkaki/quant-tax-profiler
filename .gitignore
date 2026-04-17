@@ -1,5 +1,6 @@
 data/
 outputs/
+report/
 __pycache__/
 *.pyc
 .env
@@ -7,3 +8,6 @@ __pycache__/
 dist/
 build/
 .cache/
+venv/
+.claude/
+*_temp.py
