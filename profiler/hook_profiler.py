@@ -26,6 +26,8 @@ class HookProfiler:
 
         # Externally set before each forward pass
         self.current_phase = "unknown"
+        self.current_decode_step = None
+        self.run_id = "single-run"
         self.recording = True
 
     def attach(self):
@@ -82,9 +84,11 @@ class HookProfiler:
             output_shape = _extract_shape(output)
 
             self.records.append({
+                "run_id": self.run_id,
                 "layer_name": layer_name,
                 "layer_type": module.__class__.__name__,
                 "phase": self.current_phase,
+                "decode_step": self.current_decode_step,
                 "time_ms": elapsed_ms,
                 "mem_before_mb": mem_before,
                 "mem_after_mb": mem_after,

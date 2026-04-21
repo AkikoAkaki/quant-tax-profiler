@@ -2,9 +2,12 @@
 """Main benchmark script: load model, profile prefill + decode, export CSV."""
 
 import argparse
+import json
 import os
+import platform
 import sys
 import time
+from datetime import datetime, timezone
 
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
@@ -13,9 +16,6 @@ from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from profiler.hook_profiler import HookProfiler
-from profiler.phase_detector import PhaseDetector
-
-
 def load_model(model_id: str, quantization: str):
     """Load model in FP16 or INT4."""
     print(f"Loading {model_id} in {quantization}...")
@@ -65,6 +65,7 @@ def warmup(model, tokenizer, device="cuda"):
 def run_prefill(model, profiler: HookProfiler, input_ids):
     """Measure prefill: one forward pass with the full prompt."""
     profiler.current_phase = "prefill"
+    profiler.current_decode_step = None
     profiler.recording = True
 
     with torch.no_grad():
@@ -93,6 +94,7 @@ def run_decode(model, profiler: HookProfiler, tokenizer, prompt_ids,
         next_token = outputs.logits[:, -1, :].argmax(dim=-1, keepdim=True)
 
         for step in range(max_new_tokens):
+            profiler.current_decode_step = step
             outputs = model(
                 next_token,
                 past_key_values=past_key_values,
@@ -106,6 +108,39 @@ def run_decode(model, profiler: HookProfiler, tokenizer, prompt_ids,
                 break
 
     torch.cuda.synchronize()
+    profiler.current_decode_step = None
+
+
+def build_phase_summary(df, wall_time_s: float) -> dict:
+    """Summarize one phase from the collected hook records."""
+    if df.empty:
+        return {
+            "records": 0,
+            "wall_time_s": wall_time_s,
+            "hook_total_time_ms": 0.0,
+            "peak_vram_mb": 0.0,
+            "layer_types": {},
+        }
+
+    return {
+        "records": int(len(df)),
+        "wall_time_s": wall_time_s,
+        "hook_total_time_ms": float(df["time_ms"].sum()),
+        "peak_vram_mb": float(df["mem_peak_mb"].max()),
+        "layer_types": {
+            str(k): int(v) for k, v in df["layer_type"].value_counts().to_dict().items()
+        },
+    }
+
+
+def write_metadata(path: str, payload: dict):
+    """Write JSON metadata next to benchmark CSVs."""
+    parent = os.path.dirname(path)
+    if parent:
+        os.makedirs(parent, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2, ensure_ascii=False)
+    print(f"Saved metadata: {path}")
 
 
 def main():
@@ -120,15 +155,21 @@ def main():
                         help="Number of tokens to generate in decode")
     parser.add_argument("--output-dir", default="data",
                         help="Directory for CSV output")
+    parser.add_argument("--run-id", default="single-run",
+                        help="Identifier written to every CSV record")
+    parser.add_argument("--metadata-path",
+                        help="Optional JSON path for benchmark metadata")
     args = parser.parse_args()
 
     os.makedirs(args.output_dir, exist_ok=True)
+    run_started_at = datetime.now(timezone.utc)
 
     # Load model
     model, tokenizer = load_model(args.model, args.quantization)
 
     # Setup profiler
     profiler = HookProfiler(model)
+    profiler.run_id = args.run_id
     profiler.attach()
 
     # Warmup
@@ -143,8 +184,10 @@ def main():
     prefill_time = time.perf_counter() - t0
     print(f"Prefill wall time: {prefill_time:.2f}s")
 
+    prefill_df = profiler.to_dataframe()
     prefill_path = os.path.join(args.output_dir, f"{args.quantization}_prefill.csv")
-    profiler.export_csv(prefill_path)
+    prefill_df.to_csv(prefill_path, index=False)
+    print(f"Exported {len(prefill_df)} records to {prefill_path}")
 
     # --- Decode ---
     print(f"\n=== Decode ({args.max_new_tokens} tokens) ===")
@@ -155,20 +198,46 @@ def main():
     decode_time = time.perf_counter() - t0
     print(f"Decode wall time: {decode_time:.2f}s")
 
+    decode_df = profiler.to_dataframe()
     decode_path = os.path.join(args.output_dir, f"{args.quantization}_decode.csv")
-    profiler.export_csv(decode_path)
+    decode_df.to_csv(decode_path, index=False)
+    print(f"Exported {len(decode_df)} records to {decode_path}")
 
     # Summary
     profiler.detach()
-    decode_df = profiler.to_dataframe()  # still has decode data before clear
     print(f"\n=== Summary ===")
     print(f"Model:        {args.model}")
     print(f"Quantization: {args.quantization}")
+    print(f"Run ID:       {args.run_id}")
     print(f"Prefill:      {prefill_time:.2f}s ({args.prompt_len} tokens)")
     print(f"Decode:       {decode_time:.2f}s ({args.max_new_tokens} tokens)")
     if decode_time > 0:
         print(f"Decode speed: {args.max_new_tokens / decode_time:.1f} tokens/s")
     print(f"Peak VRAM:    {torch.cuda.max_memory_allocated() / 1e6:.0f} MB")
+
+    if args.metadata_path:
+        metadata = {
+            "run_id": args.run_id,
+            "model": args.model,
+            "quantization": args.quantization,
+            "prompt_len": args.prompt_len,
+            "max_new_tokens": args.max_new_tokens,
+            "output_dir": os.path.abspath(args.output_dir),
+            "generated_at_utc": run_started_at.isoformat(),
+            "completed_at_utc": datetime.now(timezone.utc).isoformat(),
+            "host_platform": platform.platform(),
+            "python_version": platform.python_version(),
+            "torch_version": torch.__version__,
+            "cuda_available": bool(torch.cuda.is_available()),
+            "gpu_name": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+            "gpu_total_memory_mb": (
+                torch.cuda.get_device_properties(0).total_memory / 1e6
+                if torch.cuda.is_available() else None
+            ),
+            "prefill": build_phase_summary(prefill_df, prefill_time),
+            "decode": build_phase_summary(decode_df, decode_time),
+        }
+        write_metadata(args.metadata_path, metadata)
 
 
 if __name__ == "__main__":
