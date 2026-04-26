@@ -15,12 +15,12 @@ The repo baseline is:
 
 ## Files To Start With
 
-- [phase3_utils.py](/I:/Projects/quant-tax-profiler/phase3_utils.py)
-- [kernels/fp16_gemv.py](/I:/Projects/quant-tax-profiler/kernels/fp16_gemv.py)
-- [kernels/fused_fp4_gemv.py](/I:/Projects/quant-tax-profiler/kernels/fused_fp4_gemv.py)
-- [scripts/extract_linear4bit_reference.py](/I:/Projects/quant-tax-profiler/scripts/extract_linear4bit_reference.py)
-- [scripts/verify_fp16_gemv.py](/I:/Projects/quant-tax-profiler/scripts/verify_fp16_gemv.py)
-- [scripts/verify_fused_fp4.py](/I:/Projects/quant-tax-profiler/scripts/verify_fused_fp4.py)
+- [phase3_utils.py](/I:/Projects/llm-quant-profiler/phase3_utils.py)
+- [kernels/fp16_gemv.py](/I:/Projects/llm-quant-profiler/kernels/fp16_gemv.py)
+- [kernels/fused_fp4_gemv.py](/I:/Projects/llm-quant-profiler/kernels/fused_fp4_gemv.py)
+- [scripts/extract_linear4bit_reference.py](/I:/Projects/llm-quant-profiler/scripts/extract_linear4bit_reference.py)
+- [scripts/verify_fp16_gemv.py](/I:/Projects/llm-quant-profiler/scripts/verify_fp16_gemv.py)
+- [scripts/verify_fused_fp4.py](/I:/Projects/llm-quant-profiler/scripts/verify_fused_fp4.py)
 
 ## Step 1: Inspect One Real Linear4bit Layer
 

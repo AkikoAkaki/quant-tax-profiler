@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Purpose
 
-**quant-tax-profiler** measures the "quantization tax" in LLM inference: INT4 quantization compresses weights 4×, but out-of-place dequantization can introduce an extra VRAM round-trip that makes certain layers *slower* than FP16. The goal is to measure this phenomenon, explain it via Roofline analysis, and optionally fix it with a Triton fused kernel.
+**llm-quant-profiler** measures the "quantization tax" in LLM inference: INT4 quantization compresses weights 4×, but out-of-place dequantization can introduce an extra VRAM round-trip that makes certain layers *slower* than FP16. The goal is to measure this phenomenon, explain it via Roofline analysis, and optionally fix it with a Triton fused kernel.
 
 **Hardware target**: RTX 4060 Laptop 8GB VRAM (272 GB/s bandwidth, 22 TFLOPS FP16, ridge point ~80 FLOP/Byte). Decode phase is memory-bound (~1 FLOP/Byte).
 

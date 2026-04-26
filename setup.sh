@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== quant-tax-profiler environment setup (WSL2) ==="
+echo "=== llm-quant-profiler environment setup (WSL2) ==="
 
 # Check we're running in WSL2
 if ! grep -qi microsoft /proc/version 2>/dev/null; then

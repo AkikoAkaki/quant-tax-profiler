@@ -6,7 +6,7 @@
 ## 一、项目背景与目标
 
 ### 项目名称
-**quant-tax-profiler** — 低显存消费级 GPU 上的 LLM 量化税剖析与算子级优化
+**llm-quant-profiler** — 低显存消费级 GPU 上的 LLM 量化税剖析与算子级优化
 
 ### 核心问题
 在 8GB VRAM 的 RTX 4060 笔记本 GPU 上，INT4 量化模型理论上权重大小只有 FP16 的 1/4，
@@ -94,7 +94,7 @@ INT4 情况（含反量化）：
 ## 三、项目结构（最终目标）
 
 ```
-quant-tax-profiler/
+llm-quant-profiler/
 ├── README.md                      # 项目说明，包含结论摘要和复现步骤
 ├── requirements.txt               # 所有依赖
 ├── setup.sh                       # 一键环境配置脚本
@@ -346,7 +346,7 @@ LLM Quantization Tax Analysis & Operator Optimization | Self-directed Project (C
   despite 4× weight compression; explained mechanism via Roofline model and memory hierarchy analysis
 • [阶段3完成后] Implemented Triton fused dequant+matmul kernel eliminating intermediate 
   VRAM round-trip; achieved Y% throughput improvement on bottleneck layers vs. baseline
-• Open-sourced reproducible benchmark suite: github.com/[handle]/quant-tax-profiler
+• Open-sourced reproducible benchmark suite: github.com/[handle]/llm-quant-profiler
 ```
 
 ---
